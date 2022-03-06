@@ -4,6 +4,67 @@ const db = require('../db')
 
 db.on('error', console.error.bind(console, 'MongoDB connection error:'))
 
+//JWT PART begin
+const bcrypt = require('bcrypt')
+const jwt = require('jsonwebtoken')  // npm i jsonwebtoken
+const User = require('../models/user')
+
+const SALT_ROUNDS = 11
+const TOKEN_KEY = 'areallylongkey'
+
+const signUp = async (req, res) => {
+  try {
+    console.log(req.body)
+    const { username, email, password } = req.body
+    const password_digest = await bcrypt.hash(password, SALT_ROUNDS)
+    const user = await User.create({
+      username, 
+      email,
+      password_digest
+    })
+
+    const payload = {
+      id = user.id,
+      username: user.username,
+      email: user.email
+    }
+
+    const token = jwt.sign({payload, TOKEN_KEY})
+    return res.status(201).json({user, token})
+  } catch (error) {
+    console.log('error')
+    return res.status(400).json({error: error.message})
+  }
+}
+
+const signIn = async (req, res) => {
+  try {
+
+    console.log(req.body)
+    const { username, password } = req.body
+    const user = await User.findOne({
+      where: {
+        username
+      }
+    })
+    if (await bcrypt.compare(password, user.dataValues.password_digest)) {
+      const payload = {
+        id: user.id,
+        username: user.username,
+        email: user.email
+      }
+      const token = jwt.sign(payload, TOKEN_KEY)
+      return res.status(201).json({ user, token })
+    } else {
+      res.status(401).send('Invalid Credentials')
+    }
+  } catch (error) {
+    return res.status(500).json({error: error.message})
+  }
+}
+
+//JWT end 
+
 const createItem = async (req, res) => {
   try {
       const item = await new Item(req.body)
@@ -74,5 +135,7 @@ module.exports = {
     getAllItems,
     getItemById,
     updateItem,
-    deleteItem
+    deleteItem,
+    signIn, 
+    signUp
 }
